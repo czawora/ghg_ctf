@@ -14,19 +14,19 @@ L3_mg = L3 #make_load(load = 90, ghg_area = True, BAA = "C", name = "L3")
   
 gen1 = make_generator(
   energy_bid = 17, energy_cap = 50, ghg_adder = 4,
-  ghg_area = False, name = "gen1", BAA = "A"
+  ghg_area = False, name = "G1", BAA = "A"
   )
 gen2 = make_generator(
   energy_bid = 10, energy_cap = 150, ghg_adder = 0,
-  ghg_area = False, name = "gen2", BAA = "A"
+  ghg_area = False, name = "G2", BAA = "A"
   )
 gen3 = make_generator(
   energy_bid = 12, energy_cap = 50, ghg_adder = 13,
-  ghg_area = False, name = "gen3", BAA = "B"
+  ghg_area = False, name = "G3", BAA = "B"
   )
 gen4 = make_generator(
   energy_bid = 13, energy_cap = 100, ghg_adder = 20,
-  ghg_area = True, name = "gen4", BAA = "C"
+  ghg_area = True, name = "G4", BAA = "C"
   )
 
 generators = [gen1, gen2, gen3, gen4]

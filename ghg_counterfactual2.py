@@ -202,38 +202,41 @@ def make_ctf_table(
   .save(outfile)
   
   
-def make_market_table(ctf_dispatch, solution, outfile):
+def make_market_table(
+  generators,
+  gen_idx_baa_dict, 
+  non_ghg_baas,
+  ctf_dispatch, 
+  solution, 
+  outfile):
   
   mc_energy = solution["mc_energy"] 
   mc_ghg = solution["mc_ghg"]
   
   table = {
   "": ["Counterfactual Dispatch", "Market Dispatch", "GHG Attribution", "Marginal Cost, Energy\n", "Marginal Cost, GHG\n", "LMP\n"],
-  "BAA A": [
-    f'G1: {ctf_dispatch[0]} MW\nG2: {ctf_dispatch[1]} MW', 
-    f'G1: {solution["gen1_energy"]} MW\nG2:{solution["gen2_energy"]} MW', 
-    f'G1: {solution["gen1_attrib"]} MW\nG2: {solution["gen2_attrib"]} MW',
-    f'${mc_energy}',
-    '$0',
-    f'${mc_energy}',
-  ],
-  "BAA B": [
-    f'G3: {ctf_dispatch[2]} MW', 
-    f'G3: {solution["gen3_energy"]} MW', 
-    f'G3: {solution["gen3_attrib"]} MW',
-    f'${mc_energy}',
-    '$0',
-    f'${mc_energy}',
-  ],
-  "BAA C": [
-    f'G4: {ctf_dispatch[3]} MW', 
-    f'G4: {solution["gen4_energy"]} MW', 
-    f'G4: {solution["gen4_attrib"]} MW',
-    f'${mc_energy}',
-    f'${mc_ghg}',
-    f'${mc_energy + mc_ghg}',
-  ],
   }
+  
+  for baa in sorted(gen_idx_baa_dict):
+    
+    baa_gen_name_idx_pair = [(generators[idx]["name"], idx) for idx in gen_idx_baa_dict[baa]]
+    
+    col_list = []
+    col_list.append("\n".join([f'{name}: {ctf_dispatch[idx]} MW' for name, idx in baa_gen_name_idx_pair]))
+    col_list.append("\n".join([f'{name}: {solution[f"{name}_energy"]} MW' for name, idx in baa_gen_name_idx_pair]))
+    col_list.append("\n".join([f'{name}: {solution[f"{name}_attrib"]} MW' for name, idx in baa_gen_name_idx_pair]))
+    col_list.append(f'${mc_energy}')
+    
+    if baa in non_ghg_baas:
+      col_list.append(f'$0')
+      col_list.append(f'${mc_energy}')
+    else:
+      col_list.append(f'${mc_ghg}')
+      col_list.append(f'${mc_energy + mc_ghg}')
+
+    table.update({
+      f'BAA {baa}': col_list
+    })
   
   
   GT(pd.DataFrame(table))\
@@ -593,24 +596,35 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
     # Market Run Table
     
     make_market_table(
+      generators,
+      gen_idx_baa_dict,
+      non_ghg_baas,
       ["-", "-" , "-", "-"], 
       no_ctf_solution, 
       f"{outdir}/no_ctf_market_run.png"
       )
     
     make_market_table(
+      generators,
+      gen_idx_baa_dict,
+      non_ghg_baas,
       vistra_ctf_dispatch, 
       vistra_solution, 
       f"{outdir}/vistra_market_run.png"
       )
       
     make_market_table(
-      caiso_ctf_dispatch, 
+      generators,
+      gen_idx_baa_dict,
+      non_ghg_baas,caiso_ctf_dispatch, 
       caiso_solution, 
       f"{outdir}/caiso_market_run.png"
       )
       
     make_market_table(
+      generators,
+      gen_idx_baa_dict,
+      non_ghg_baas,
       noghg_ctf_dispatch, 
       noghg_solution, 
       f"{outdir}/noghg_market_run.png"
