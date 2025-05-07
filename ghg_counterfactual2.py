@@ -132,27 +132,31 @@ def run_solver(
   return solver, solution
 
 
-def make_ctf_table(vistra_ctf_dispatch, caiso_ctf_dispatch, noghg_ctf_dispatch, outfile):
-
-  ctf_table = {
-    "Counterfactual": ["Vistra", "CAISO", "No GHG Cost"],
-    "BAA A": [
-      f'G1: {vistra_ctf_dispatch[0]} MW\nG2: {vistra_ctf_dispatch[1]} MW', 
-      f'G1: {caiso_ctf_dispatch[0]} MW\nG2: {caiso_ctf_dispatch[1]} MW', 
-      f'G1: {noghg_ctf_dispatch[0]} MW\nG2: {noghg_ctf_dispatch[1]} MW'
-    ],
-    "BAA B": [
-      f'G3: {vistra_ctf_dispatch[2]} MW', 
-      f'G3: {caiso_ctf_dispatch[2]} MW', 
-      f'G3: {noghg_ctf_dispatch[2]} MW'
-    ],
-    "BAA C": [
-      f'G4: {vistra_ctf_dispatch[3]} MW', 
-      f'G4: {caiso_ctf_dispatch[3]} MW', 
-      f'G4: {noghg_ctf_dispatch[3]} MW'
-    ],
-    }
+def make_ctf_table(
+  generators,
+  gen_idx_baa_dict, 
+  vistra_ctf_dispatch, 
+  caiso_ctf_dispatch, 
+  noghg_ctf_dispatch, 
+  outfile
+  ):
+    
+  ctf_list = [vistra_ctf_dispatch, caiso_ctf_dispatch, noghg_ctf_dispatch]
   
+  ctf_table = {
+    "Counterfactual": ["Vistra", "CAISO", "No GHG Cost"]
+  }
+  
+  for baa in sorted(gen_idx_baa_dict):
+    
+    baa_ctf_list = []
+    
+    for ctf in ctf_list:
+      baa_ctf_list.append("\n".join([f'{generators[idx]["name"]}: {ctf[idx]} MW' for idx in gen_idx_baa_dict[baa]]))
+    
+    ctf_table.update({
+      f'BAA {baa}': baa_ctf_list
+    })
   
   GT(pd.DataFrame(ctf_table))\
   .tab_header(
@@ -449,14 +453,18 @@ def make_rev_dist_table(
 
 def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
 
+  # note assuming gen and load is in baa order with ghg baa last
+
   baa_set = sorted(list(set([i['BAA'] for i in generators])))
   # assuming generator baas cover all baas
 
   # group gen by baa
   gen_baa_dict = {baa: [] for baa in baa_set}
+  gen_idx_baa_dict = {baa: [] for baa in baa_set}
 
-  for g in generators:
+  for idx, g in enumerate(generators):
     gen_baa_dict[g['BAA']].append(g)
+    gen_idx_baa_dict[g['BAA']].append(idx)
 
   # group load by baa
   load_baa_dict = {baa: [] for baa in baa_set}
@@ -464,7 +472,15 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
   for l in ctf_loads:
     load_baa_dict[l['BAA']].append(l)
 
+  # useful groups
+  non_ghg_baas = [g['BAA'] for g in generators if not g['ghg_area']]
+  non_ghg_gen = [g for g in generators if g['BAA'] in non_ghg_baas]
+  non_ghg_load = [l for l in ctf_loads if l['BAA'] in non_ghg_baas]
+  ghg_gen = [g for g in generators if g['BAA'] not in non_ghg_baas]
+  ghg_gen_idx = [idx for idx, g in enumerate(generators) if g['BAA'] not in non_ghg_baas]
+  
 
+  #vistra ctf
   vistra_ctf_dispatch = []
 
   for baa in baa_set:
@@ -483,47 +499,20 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
       vistra_ctf_dispatch += [round(v.solution_value()) for v in vistra_ctf_solver.variables()]
     
   
-  # if generators[0]['energy_bid'] < generators[1]['energy_bid']:
-  #   
-  #   excess_demand = ctf_loads[0]['load'] - generators[0]['energy_cap']
-  #   
-  #   if excess_demand <= 0:
-  #     vistra_ctf_dispatch.append(ctf_loads[0]['load'])
-  #     vistra_ctf_dispatch.append(0)
-  #     
-  #   else: 
-  #     vistra_ctf_dispatch.append(generators[0]['energy_cap'])
-  #     vistra_ctf_dispatch.append(excess_demand)
-  #     
-  # else:
-  #   
-  #   excess_demand = ctf_loads[0]['load'] - generators[1]['energy_cap']
-  # 
-  #   if excess_demand <= 0:
-  #     vistra_ctf_dispatch.append(0)
-  #     vistra_ctf_dispatch.append(ctf_loads[0]['load'])
-  #     
-  #   else:
-  #     vistra_ctf_dispatch.append(excess_demand)
-  #     vistra_ctf_dispatch.append(generators[0]['energy_cap'])
-  #     
-  # 
-  # vistra_ctf_dispatch.append(ctf_loads[1]['load'])
-  # vistra_ctf_dispatch.append(0)
-  
-  print(vistra_ctf_dispatch)
-  
+  # caiso ctf
   
   caiso_ctf = run_solver(
-    generators[0:3],
-    ctf_loads[0:2],
+    non_ghg_gen,
+    non_ghg_load,
     include_ghg = False
     )
     
   caiso_ctf_solver, _ = caiso_ctf
-  caiso_ctf_dispatch = [round(v.solution_value()) for v in caiso_ctf_solver.variables()][0:3] + [0]
-  
-  print(caiso_ctf_dispatch)
+  caiso_ctf_dispatch = [round(v.solution_value()) for v in caiso_ctf_solver.variables()]
+  caiso_ctf_dispatch += [0 for g in ghg_gen]  
+
+
+  # no ghg ctf
   
   noghg_ctf = run_solver(
     generators,
@@ -534,10 +523,8 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
   noghg_ctf_solver, _ = noghg_ctf
   noghg_ctf_dispatch = [round(v.solution_value()) for v in noghg_ctf_solver.variables()]
   
-  print(noghg_ctf_dispatch)
-  
   ghg_area_load = sum([l['load'] for l in ctf_loads if l['ghg_area']])
-  ghg_area_dispatch = noghg_ctf_dispatch[3]
+  ghg_area_dispatch = sum([disp for idx, disp in enumerate(noghg_ctf_dispatch) if idx in ghg_gen_idx])
   noghg_net_import_ref = ghg_area_load - ghg_area_dispatch
   
   
@@ -588,6 +575,8 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
   
     # create tables
     make_ctf_table(
+      generators,
+      gen_idx_baa_dict,
       vistra_ctf_dispatch, 
       caiso_ctf_dispatch, 
       noghg_ctf_dispatch, 
