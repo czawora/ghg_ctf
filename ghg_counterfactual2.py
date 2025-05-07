@@ -344,16 +344,17 @@ def make_gen_settlement_table(gen, vistra_solution, caiso_solution, noghg_soluti
   return gt_table
   
   
-def make_load_settlement_table(vistra_solution, caiso_solution, noghg_solution):
+def make_load_settlement_table(loads, vistra_solution, caiso_solution, noghg_solution):
   
   sols = [vistra_solution, caiso_solution, noghg_solution]
   
-  table = {
-    "Counterfactual": ["Vistra", "CAISO", "No GHG Cost"],
-    "L1": [f'{s["L1_cost_form"]} = ${s["L1_cost_res"]}' for s in sols],
-    "L2": [f'{s["L2_cost_form"]} = ${s["L2_cost_res"]}' for s in sols],
-    "L3": [f'{s["L3_cost_form"]} = ${s["L3_cost_res"]}' for s in sols]
-  }
+  table = {"Counterfactual": ["Vistra", "CAISO", "No GHG Cost"]}
+  
+  for l in loads:
+    load_name = l["name"]
+    form = f"{load_name}_cost_form"
+    res = f"{load_name}_cost_res"
+    table.update({load_name: [f'{s[form]} = ${s[res]}' for s in sols]})
   
   gt_table = GT(pd.DataFrame(table))
     
@@ -361,6 +362,8 @@ def make_load_settlement_table(vistra_solution, caiso_solution, noghg_solution):
 
 
 def make_op_settlement_table(generators, loads, vistra_solution, caiso_solution, noghg_solution):
+
+  row_labels = [g["name"] for g in generators] + [l["name"] for l in loads] + ["ISO Balance"]
 
   vistra_gen_payments = [-1*vistra_solution[f'{g["name"]}_revenue_res'] for g in generators] 
   vistra_load_payments = [vistra_solution[f'{l["name"]}_cost_res'] for l in loads]
@@ -376,7 +379,7 @@ def make_op_settlement_table(generators, loads, vistra_solution, caiso_solution,
     
 
   table = {
-    "": ["G1", "G2", "G3", "G4", "L1", "L2", "L3", "Market Operator Balance"],
+    "": row_labels,
     "Vistra": vistra_gen_payments + vistra_load_payments + [vistra_op_balance],
     "CAISO": caiso_gen_payments + caiso_load_payments + [caiso_op_balance],
     "No GHG Cost": noghg_gen_payments + noghg_load_payments + [noghg_op_balance]
@@ -644,7 +647,7 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
     
     # load settlement
     
-    make_load_settlement_table(vistra_solution, caiso_solution, noghg_solution)\
+    make_load_settlement_table(loads, vistra_solution, caiso_solution, noghg_solution)\
     .save(f"{outdir}/load_settlement.png")
     
     
