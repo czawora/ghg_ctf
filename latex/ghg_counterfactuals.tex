@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb}
+
+\begin{document}
+
+\textit{Objective:}
+
+\[
+\min \left( \sum_i C_i G_i + \sum_j (C_j G_j + C_{G_j} E_j) \right)
+\]
+
+\textit{subject to:}
+
+\begin{align*}
+\text{power balance:} \quad & \sum_i (G_i - L_i) + \sum_j (G_j - L_j) = 0 \\
+\text{net export allocation:} & \sum_j (G_j - L_j) \leq \sum_j E_j  +  \max(0, ~ \sum_j ( G_j^{(GHG)} - L_j ))\\
+\text{generator limits:} \quad & G_{\text{MIN}i} \leq G_i \leq G_{\text{MAX}i}, \quad \forall i \\
+& G_{\text{MIN}j} \leq G_j \leq G_{\text{MAX}j}, \quad \forall j \\
+\text{allocation limits:} \quad & 0 \leq E_j \leq \min(G_j, ~E_{\text{MAX}j}, ~G_{\text{MAX}j} - G_j^{(GHG)}), \quad \forall j \\\\
+\end{align*}
+
+Differences from the formulation in the BPM 11.3.3.2.1:\\
+\begin{itemize}
+\item Remove the transmission constraints, since the assumption is no transmission limits for these examples.\\
+\item The added term in the net export allocation constraint, \\$ \max(0, ~ \sum_j ( G_j^{(GHG)} - L_j ))$, which represents the imports into the GHG area in the counterfactual run.
+This term is $0$ when using the CAISO and Vistra counterfactuals and may be positive when using the No GHG Cost counterfactual.\\
+\item The inclusion of the term $G_{\text{MAX}j} - G_j^{(GHG)}$ in the allocation limit constraint to match the attribution limits in the BPM with those in the EDAM technical description (9.2).
+\end{itemize}
+
+
+\end{document}
