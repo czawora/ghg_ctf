@@ -102,6 +102,7 @@ def run_solver(
   })
   
   if include_ghg:
+    
     for idx, vars in enumerate(zip(gen_energy_vars, gen_attrib_vars)):
       
       if generators[idx]['ghg_area']:
@@ -110,9 +111,13 @@ def run_solver(
       if not generators[idx]['ghg_area']:
         constraints.update({solver.Add(vars[1] - vars[0] <= 0).name(): f"alloc_limit{idx + 1}"})
     
+    
+    non_ghg_energy_vars = [energy_var for gen, energy_var in zip(generators, gen_energy_vars) if not gen['ghg_area']]
+    non_ghg_attrib_vars = [attrib_var for gen, attrib_var in zip(generators, gen_attrib_vars) if not gen['ghg_area']]
+    
     constraints.update({
       solver.Add(
-        sum(gen_energy_vars[0:3]) + (-1) * sum(gen_attrib_vars[0:3]) <= non_ghg_area_load + net_import_reference_mw).name():
+        sum(non_ghg_energy_vars) + (-1) * sum(non_ghg_attrib_vars) <= non_ghg_area_load + net_import_reference_mw).name():
         "export_constraint"
       })
       
@@ -602,7 +607,7 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
       generators,
       gen_idx_baa_dict,
       non_ghg_baas,
-      ["-", "-" , "-", "-"], 
+      ["-"] * len(generators), 
       no_ctf_solution, 
       f"{outdir}/no_ctf_market_run.png"
       )
@@ -647,7 +652,7 @@ def run_all(generators, ctf_loads, market_loads, outdir, write_tables = True):
     
     # load settlement
     
-    make_load_settlement_table(loads, vistra_solution, caiso_solution, noghg_solution)\
+    make_load_settlement_table(market_loads, vistra_solution, caiso_solution, noghg_solution)\
     .save(f"{outdir}/load_settlement.png")
     
     
